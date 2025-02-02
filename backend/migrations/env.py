@@ -7,6 +7,7 @@ from alembic import context
 from app.db.session import Base
 from app.db.base import Base
 from app.models.user import User
+from app.models.coin import Coin
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
