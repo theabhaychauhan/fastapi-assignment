@@ -1,18 +1,20 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File
 from sqlalchemy.orm import Session
 from fastapi.security import OAuth2PasswordBearer
-from app.schemas.user import UserCreate, UserLogin, UserResponse
-from app.services.auth_service import register_user, authenticate_user, create_auth_token
+from app.schemas.user import UserCreate, UserLogin, UserResponse, UserUpdate
+from app.services.auth_service import register_user, authenticate_user, create_auth_token, get_current_user, create_jwt_token, get_password_hash
 from app.db.session import get_db
-from app.core.config import settings
 import httpx
 from fastapi.responses import RedirectResponse
-from app.services.auth_service import get_current_user, get_google_oauth2_config, create_jwt_token
 from app.models.user import User
+from app.core.config import settings
+import os
+from app.schemas.user import PasswordReset
+
 
 router = APIRouter()
 
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="auth/login")
 
 @router.post("/register", response_model=UserResponse)
 def register(user_data: UserCreate, db: Session = Depends(get_db)):
@@ -89,3 +91,46 @@ async def get_google_user_info(access_token: str):
         response = await client.get(url, headers={"Authorization": f"Bearer {access_token}"})
         return response.json()
 
+@router.put("/profile/update", response_model=UserResponse)
+async def update_user_profile(
+    updated_user: UserUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    db_user = db.query(User).filter(User.id == current_user.id).first()
+
+    if not db_user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    if updated_user.password:
+        updated_user.password = get_password_hash(updated_user.password)
+
+    for key, value in updated_user.dict(exclude_unset=True).items():
+        setattr(db_user, key, value)
+
+    db.commit()
+    db.refresh(db_user)
+
+    return UserResponse(
+        email=db_user.email,
+        full_name=db_user.full_name,
+        is_active=db_user.is_active,
+        bio=db_user.bio,
+        phone=db_user.phone,
+    )
+
+@router.put("/profile/reset-password")
+def reset_password(
+    password_data: PasswordReset,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    db_user = db.query(User).filter(User.id == current_user.id).first()
+
+    if not db_user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    db_user.password = get_password_hash(password_data.new_password)
+    db.commit()
+    db.refresh(db_user)
+    return {"message": "Password updated successfully"}
