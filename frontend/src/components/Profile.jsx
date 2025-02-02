@@ -4,13 +4,20 @@ import { useNavigate } from 'react-router-dom';
 const Profile = () => {
     const [user, setUser] = useState(null);
     const [error, setError] = useState(null);
+    const [editMode, setEditMode] = useState(false);
+    const [updatedUser, setUpdatedUser] = useState({
+        full_name: '',
+        bio: '',
+        phone: '',
+        email: '',
+    });
 
     const navigate = useNavigate();
     const token = localStorage.getItem("token");
 
     useEffect(() => {
         if (!token) {
-            navigate('/login'); // Redirect to login page if token is not available
+            navigate('/login');
             return;
         }
 
@@ -19,8 +26,8 @@ const Profile = () => {
                 const response = await fetch("http://localhost:8000/auth/profile", {
                     method: "GET",
                     headers: {
-                        "Authorization": `Bearer ${token}`
-                    }
+                        "Authorization": `Bearer ${token}`,
+                    },
                 });
 
                 if (!response.ok) {
@@ -29,6 +36,12 @@ const Profile = () => {
 
                 const userData = await response.json();
                 setUser(userData);
+                setUpdatedUser({
+                    full_name: userData.full_name,
+                    bio: userData.bio,
+                    phone: userData.phone,
+                    email: userData.email,
+                });
             } catch (err) {
                 setError(err.message);
             }
@@ -39,9 +52,41 @@ const Profile = () => {
 
     const handleLogout = () => {
         localStorage.removeItem("token");
-        navigate('/login'); // Redirect to login page after logout
+        navigate('/login');
     };
 
+    const handleChange = (e) => {
+        setUpdatedUser({
+            ...updatedUser,
+            [e.target.name]: e.target.value,
+        });
+    };
+
+    const handleSubmit = async (e) => {
+        e.preventDefault();
+    
+        try {
+            const response = await fetch("http://localhost:8000/auth/profile/update", {
+                method: "PUT",
+                headers: {
+                    "Authorization": `Bearer ${token}`,
+                    "Content-Type": "application/json",
+                },
+                body: JSON.stringify(updatedUser),
+            });
+    
+            if (!response.ok) {
+                throw new Error("Failed to update user details");
+            }
+    
+            const updatedUserData = await response.json();
+            setUser(updatedUserData);
+            setEditMode(false);
+        } catch (err) {
+            setError(err.message);
+        }
+    };
+    
     if (error) {
         return <p style={{ color: "red" }}>{error}</p>;
     }
@@ -52,7 +97,51 @@ const Profile = () => {
                 <>
                     <h2>Welcome, {user.full_name}!</h2>
                     <p>Email: {user.email}</p>
+                    <p>Bio: {user.bio}</p>
+                    <p>Phone: {user.phone}</p>
                     <button onClick={handleLogout}>Logout</button>
+
+                    <button onClick={() => setEditMode(!editMode)}>
+                        {editMode ? "Cancel" : "Edit Profile"}
+                    </button>
+
+                    {editMode && (
+                        <form onSubmit={handleSubmit}>
+                            <input
+                                type="text"
+                                name="full_name"
+                                value={updatedUser.full_name}
+                                onChange={handleChange}
+                                placeholder="Full Name"
+                            />
+                            <br />
+                            <input
+                                type="text"
+                                name="bio"
+                                value={updatedUser.bio}
+                                onChange={handleChange}
+                                placeholder="Bio"
+                            />
+                            <br />
+                            <input
+                                type="text"
+                                name="phone"
+                                value={updatedUser.phone}
+                                onChange={handleChange}
+                                placeholder="Phone"
+                            />
+                            <br />
+                            <input
+                                type="email"
+                                name="email"
+                                value={updatedUser.email}
+                                onChange={handleChange}
+                                placeholder="Email"
+                            />
+                            <br />
+                            <button type="submit">Save Changes</button>
+                        </form>
+                    )}
                 </>
             ) : (
                 <p>Loading...</p>
