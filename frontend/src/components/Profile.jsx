@@ -1,5 +1,9 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { Bar } from 'react-chartjs-2';
+import { Chart as ChartJS, CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend } from 'chart.js';
+
+ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend);
 
 const Profile = () => {
     const [user, setUser] = useState(null);
@@ -185,12 +189,47 @@ const Profile = () => {
         }
     };
 
+    const getChartData = () => {
+        if (!coinDetails) return {};
+
+        const labels = coinDetails.map((data) => new Date(data.timestamp).toLocaleString());
+        const dataPoints = coinDetails.map((data) => data.price);
+
+        const minValue = Math.min(...dataPoints) * 0.95;
+        const maxValue = Math.max(...dataPoints) * 1.05;
+
+        return {
+            labels,
+            datasets: [
+                {
+                    label: `${selectedCoin} Price`,
+                    data: dataPoints,
+                    borderColor: 'rgba(75, 192, 192, 1)',
+                    backgroundColor: 'rgba(75, 192, 192, 0.2)',
+                    borderWidth: 1,
+                    barThickness: 10,
+                },
+            ],
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    y: {
+                        min: minValue,
+                        max: maxValue,
+                    },
+                },
+            },
+        };
+    };
+
+
     if (error) {
         return <p style={{ color: "red" }}>{error}</p>;
     }
 
     return (
-        <div style={{ maxWidth: "400px", margin: "auto", padding: "20px" }}>
+        <div style={{ maxWidth: "800px", margin: "auto", padding: "20px" }}>
             {user ? (
                 <>
                     <h2>Welcome, {user.full_name}!</h2>
@@ -283,22 +322,7 @@ const Profile = () => {
                     {coinDetails && (
                         <div>
                             <h3>{selectedCoin} Historical Data:</h3>
-                            <table>
-                                <thead>
-                                    <tr>
-                                        <th>Timestamp</th>
-                                        <th>Price</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {coinDetails.map((data, index) => (
-                                        <tr key={index}>
-                                            <td>{new Date(data.timestamp).toLocaleString()}</td>
-                                            <td>{data.price}</td>
-                                        </tr>
-                                    ))}
-                                </tbody>
-                            </table>
+                            <Bar data={getChartData()} options={{ responsive: true, maintainAspectRatio: false }} />
                         </div>
                     )}
 
