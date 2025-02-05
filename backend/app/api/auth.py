@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File
 from fastapi.responses import RedirectResponse
 from sqlalchemy.orm import Session
 from fastapi.security import OAuth2PasswordBearer
-from app.schemas.user import UserCreate, UserLogin, UserResponse, UserUpdate
+from app.schemas.user import UserCreate, UserLogin, UserResponse, UserProfileUpdate
 from app.services.auth_service import register_user, authenticate_user, create_auth_token, get_current_user, create_jwt_token, get_password_hash
 from app.db.session import get_db
 import httpx
@@ -94,37 +94,27 @@ async def get_google_user_info(access_token: str):
         return response.json()
 
 @router.put("/profile/update", response_model=UserResponse)
-async def update_user_profile(
-    updated_user: UserUpdate,
-    photo: UploadFile = File(None),
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
-):
-    db_user = db.query(User).filter(User.id == current_user.id).first()
-
-    if not db_user:
+async def update_user_profile(updated_user: UserProfileUpdate, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    user = db.query(User).filter(User.id == current_user.id).first()
+    
+    if not user:
         raise HTTPException(status_code=404, detail="User not found")
 
-    if updated_user.password:
-        updated_user.password = get_password_hash(updated_user.password)
-
-    if photo:
-        photo_path = f"uploads/{current_user.id}_profile.jpg"
-        with open(photo_path, "wb") as buffer:
-            buffer.write(await photo.read())
-        db_user.photo = photo_path
-    for key, value in updated_user.dict(exclude_unset=True).items():
-        setattr(db_user, key, value)
+    user.full_name = updated_user.full_name
+    user.bio = updated_user.bio
+    user.phone = updated_user.phone
+    user.email = updated_user.email
 
     db.commit()
-    db.refresh(db_user)
+    db.refresh(user)
 
     return UserResponse(
-        email=db_user.email,
-        full_name=db_user.full_name,
-        is_active=db_user.is_active,
-        bio=db_user.bio,
-        phone=db_user.phone,
+        id=user.id,
+        email=user.email,
+        full_name=user.full_name,
+        bio=user.bio,
+        phone=user.phone,
+        is_active=user.is_active,
     )
 
 @router.put("/profile/reset-password")
