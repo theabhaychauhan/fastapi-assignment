@@ -36,7 +36,7 @@ const Login = () => {
             const data = await response.json();
             setToken(data.access_token);
             localStorage.setItem("token", data.access_token);
-            navigate('/profile'); // Redirect to Profile page
+            navigate('/profile');
         } catch (err) {
             setError(err.message);
         }

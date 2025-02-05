@@ -16,6 +16,7 @@ class UserResponse(BaseModel):
     is_active: bool
     phone: Optional[str]
     bio: Optional[str]
+    photo: Optional[str]
 
 class UserBase(BaseModel):
     email: EmailStr
@@ -27,7 +28,7 @@ class UserCreate(UserBase):
     password: str
 
 class UserUpdate(UserBase):
-    password: str = None
+    password: Optional[str] = None
 
 class UserInDB(UserBase):
     id: int

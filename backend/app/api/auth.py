@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File
+from fastapi.responses import RedirectResponse
 from sqlalchemy.orm import Session
 from fastapi.security import OAuth2PasswordBearer
 from app.schemas.user import UserCreate, UserLogin, UserResponse, UserUpdate
@@ -10,7 +11,6 @@ from app.models.user import User
 from app.core.config import settings
 import os
 from app.schemas.user import PasswordReset
-
 
 router = APIRouter()
 
@@ -76,7 +76,9 @@ async def google_callback(code: str, db: Session = Depends(get_db)):
         db.commit()
 
     token = create_jwt_token(user)
-    return {"access_token": token, "token_type": "bearer"}
+    redirect_url = f"http://localhost:5173/profile?token={token}"
+    return RedirectResponse(url=redirect_url)
+
 
 async def get_google_oauth2_config():
     async with httpx.AsyncClient() as client:
@@ -94,6 +96,7 @@ async def get_google_user_info(access_token: str):
 @router.put("/profile/update", response_model=UserResponse)
 async def update_user_profile(
     updated_user: UserUpdate,
+    photo: UploadFile = File(None),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
@@ -105,6 +108,11 @@ async def update_user_profile(
     if updated_user.password:
         updated_user.password = get_password_hash(updated_user.password)
 
+    if photo:
+        photo_path = f"uploads/{current_user.id}_profile.jpg"
+        with open(photo_path, "wb") as buffer:
+            buffer.write(await photo.read())
+        db_user.photo = photo_path
     for key, value in updated_user.dict(exclude_unset=True).items():
         setattr(db_user, key, value)
 
@@ -134,3 +142,27 @@ def reset_password(
     db.commit()
     db.refresh(db_user)
     return {"message": "Password updated successfully"}
+
+if not os.path.exists("uploads"):
+    os.makedirs("uploads")
+
+@router.post("/profile/upload-photo")
+async def upload_photo(
+    photo: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    db_user = db.query(User).filter(User.id == current_user.id).first()
+
+    if not db_user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    photo_path = f"uploads/{current_user.id}_profile.jpg"
+    with open(photo_path, "wb") as buffer:
+        buffer.write(await photo.read())
+
+    db_user.photo = photo_path
+    db.commit()
+    db.refresh(db_user)
+
+    return {"message": "Photo uploaded successfully", "photo_url": photo_path}

@@ -10,7 +10,12 @@ const Profile = () => {
         bio: '',
         phone: '',
         email: '',
+        photo: null,
     });
+    const [coins, setCoins] = useState([]);
+    const [selectedCoin, setSelectedCoin] = useState('');
+    const [coinDetails, setCoinDetails] = useState(null);
+    const [weatherData, setWeatherData] = useState(null);
 
     const navigate = useNavigate();
     const token = localStorage.getItem("token");
@@ -56,15 +61,22 @@ const Profile = () => {
     };
 
     const handleChange = (e) => {
-        setUpdatedUser({
-            ...updatedUser,
-            [e.target.name]: e.target.value,
-        });
+        if (e.target.name === "photo") {
+            setUpdatedUser({
+                ...updatedUser,
+                photo: e.target.files[0],
+            });
+        } else {
+            setUpdatedUser({
+                ...updatedUser,
+                [e.target.name]: e.target.value,
+            });
+        }
     };
 
     const handleSubmit = async (e) => {
         e.preventDefault();
-    
+
         try {
             const response = await fetch("http://localhost:8000/auth/profile/update", {
                 method: "PUT",
@@ -74,11 +86,11 @@ const Profile = () => {
                 },
                 body: JSON.stringify(updatedUser),
             });
-    
+
             if (!response.ok) {
                 throw new Error("Failed to update user details");
             }
-    
+
             const updatedUserData = await response.json();
             setUser(updatedUserData);
             setEditMode(false);
@@ -86,7 +98,84 @@ const Profile = () => {
             setError(err.message);
         }
     };
-    
+
+    const handlePhotoUpload = async (e) => {
+        e.preventDefault();
+
+        const formData = new FormData();
+        formData.append("photo", updatedUser.photo);
+
+        try {
+            const response = await fetch("http://localhost:8000/auth/profile/upload-photo", {
+                method: "POST",
+                headers: {
+                    "Authorization": `Bearer ${token}`,
+                },
+                body: formData,
+            });
+
+            if (!response.ok) {
+                throw new Error("Failed to upload photo");
+            }
+
+            const result = await response.json();
+            console.log(result.message);
+        } catch (err) {
+            setError(err.message);
+        }
+    };
+
+    const fetchAvailableCoins = async () => {
+        try {
+            const response = await fetch("http://localhost:8000/binance/data", {
+                method: 'GET',
+                headers: {
+                    'accept': 'application/json',
+                },
+            });
+            if (!response.ok) {
+                throw new Error("Failed to fetch coin data");
+            }
+            const data = await response.json();
+            setCoins(data);
+        } catch (err) {
+            setError(err.message);
+        }
+    };
+
+    const handleSelectCoin = async (coinSymbol) => {
+        setSelectedCoin(coinSymbol);
+
+        if (coinSymbol) {
+            try {
+                const response = await fetch(`https://api.binance.com/api/v3/ticker/24hr?symbol=${coinSymbol}`);
+                if (!response.ok) {
+                    throw new Error("Failed to fetch coin details");
+                }
+                const data = await response.json();
+                setCoinDetails(data);
+            } catch (err) {
+                setError(err.message);
+            }
+        } else {
+            setCoinDetails(null);
+        }
+    };
+
+    const fetchWeatherData = async () => {
+        try {
+            const response = await fetch("http://localhost:8000/weather/data");
+            const data = await response.json();
+            if (data.error) {
+                setError(data.error);
+            } else {
+                setWeatherData(data);
+            }
+        } catch (err) {
+            setError("Failed to fetch weather data");
+        }
+    };
+
     if (error) {
         return <p style={{ color: "red" }}>{error}</p>;
     }
@@ -99,6 +188,7 @@ const Profile = () => {
                     <p>Email: {user.email}</p>
                     <p>Bio: {user.bio}</p>
                     <p>Phone: {user.phone}</p>
+                    {user.photo && <img src={user.photo} alt="Profile" style={{ width: '100%', borderRadius: '8px' }} />}
                     <button onClick={handleLogout}>Logout</button>
 
                     <button onClick={() => setEditMode(!editMode)}>
@@ -139,8 +229,61 @@ const Profile = () => {
                                 placeholder="Email"
                             />
                             <br />
+                            <input
+                                type="file"
+                                name="photo"
+                                accept="image/*"
+                                onChange={handleChange}
+                            />
+                            <br />
                             <button type="submit">Save Changes</button>
                         </form>
+                    )}
+
+                    {updatedUser.photo && (
+                        <button onClick={handlePhotoUpload}>
+                            Upload Photo
+                        </button>
+                    )}
+
+                    <button onClick={fetchAvailableCoins}>
+                        Fetch Coins
+                    </button>
+
+                    {coins.length > 0 && (
+                        <>
+                            <h3>Available Coins:</h3>
+                            <pre>{JSON.stringify(coins, null, 2)}</pre>
+
+                            <h3>Select a Coin:</h3>
+                            <select value={selectedCoin} onChange={(e) => handleSelectCoin(e.target.value)}>
+                                <option value="">Select a coin</option>
+                                {coins.map((coin) => (
+                                    <option key={coin.symbol} value={coin.symbol}>
+                                        {coin.symbol}
+                                    </option>
+                                ))}
+                            </select>
+
+                            {coinDetails && (
+                                <div>
+                                    <h3>{coinDetails.symbol} Details:</h3>
+                                    <p>Last Price: {coinDetails.lastPrice}</p>
+                                    <p>Price Change Percent: {coinDetails.priceChangePercent}%</p>
+                                </div>
+                            )}
+                        </>
+                    )}
+
+                    <button onClick={fetchWeatherData}>
+                        Fetch Weather Data
+                    </button>
+
+                    {weatherData && (
+                        <div>
+                            <h3>Weather Data:</h3>
+                            <pre>{JSON.stringify(weatherData, null, 2)}</pre>
+                        </div>
                     )}
                 </>
             ) : (
