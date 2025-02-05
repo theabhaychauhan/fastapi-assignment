@@ -76,7 +76,7 @@ async def google_callback(code: str, db: Session = Depends(get_db)):
         db.commit()
 
     token = create_jwt_token(user)
-    redirect_url = f"http://localhost:5173/profile?token={token}"
+    redirect_url = f"http://localhost:5173/profile-redirect?token={token}"
     return RedirectResponse(url=redirect_url)
 
 
@@ -138,7 +138,7 @@ def reset_password(
     if not db_user:
         raise HTTPException(status_code=404, detail="User not found")
 
-    db_user.password = get_password_hash(password_data.new_password)
+    db_user.hashed_password = get_password_hash(password_data.new_password)
     db.commit()
     db.refresh(db_user)
     return {"message": "Password updated successfully"}

@@ -128,7 +128,7 @@ const Profile = () => {
     const fetchAvailableCoins = async () => {
         try {
             const response = await fetch("http://localhost:8000/binance/data", {
-                method: 'GET',
+                method: 'POST',
                 headers: {
                     'accept': 'application/json',
                 },
@@ -148,13 +148,22 @@ const Profile = () => {
 
         if (coinSymbol) {
             try {
-                const response = await fetch(`https://api.binance.com/api/v3/ticker/24hr?symbol=${coinSymbol}`);
+                const response = await fetch(`http://localhost:8000/coin-prices/${coinSymbol}`);
+                
                 if (!response.ok) {
-                    throw new Error("Failed to fetch coin details");
+                    throw new Error("Failed to fetch coin prices from DB");
                 }
+
                 const data = await response.json();
-                setCoinDetails(data);
+                console.log("Received data:", data);
+
+                if (data.error) {
+                    setError(data.error);
+                } else {
+                    setCoinDetails(data);
+                }
             } catch (err) {
+                console.error("Error fetching data:", err);
                 setError(err.message);
             }
         } else {
@@ -193,6 +202,10 @@ const Profile = () => {
 
                     <button onClick={() => setEditMode(!editMode)}>
                         {editMode ? "Cancel" : "Edit Profile"}
+                    </button>
+
+                    <button onClick={() => navigate("/reset-password")}>
+                        Reset Password
                     </button>
 
                     {editMode && (
@@ -264,15 +277,29 @@ const Profile = () => {
                                     </option>
                                 ))}
                             </select>
-
-                            {coinDetails && (
-                                <div>
-                                    <h3>{coinDetails.symbol} Details:</h3>
-                                    <p>Last Price: {coinDetails.lastPrice}</p>
-                                    <p>Price Change Percent: {coinDetails.priceChangePercent}%</p>
-                                </div>
-                            )}
                         </>
+                    )}
+
+                    {coinDetails && (
+                        <div>
+                            <h3>{selectedCoin} Historical Data:</h3>
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th>Timestamp</th>
+                                        <th>Price</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {coinDetails.map((data, index) => (
+                                        <tr key={index}>
+                                            <td>{new Date(data.timestamp).toLocaleString()}</td>
+                                            <td>{data.price}</td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
                     )}
 
                     <button onClick={fetchWeatherData}>
