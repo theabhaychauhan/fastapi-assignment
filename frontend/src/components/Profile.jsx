@@ -14,7 +14,6 @@ const Profile = () => {
         bio: '',
         phone: '',
         email: '',
-        photo: null,
     });
     const [coins, setCoins] = useState([]);
     const [selectedCoin, setSelectedCoin] = useState('');
@@ -65,69 +64,40 @@ const Profile = () => {
     };
 
     const handleChange = (e) => {
-        if (e.target.name === "photo") {
-            setUpdatedUser({
-                ...updatedUser,
-                photo: e.target.files[0],
-            });
-        } else {
-            setUpdatedUser({
-                ...updatedUser,
-                [e.target.name]: e.target.value,
-            });
-        }
+        setUpdatedUser({
+            ...updatedUser,
+            [e.target.name]: e.target.value,
+        });
     };
 
     const handleSubmit = async (e) => {
         e.preventDefault();
-
+    
         try {
             const response = await fetch("http://localhost:8000/auth/profile/update", {
                 method: "PUT",
                 headers: {
-                    "Authorization": `Bearer ${token}`,
+                    "Authorization": `Bearer ${localStorage.getItem("token")}`,
                     "Content-Type": "application/json",
                 },
                 body: JSON.stringify(updatedUser),
             });
-
+    
             if (!response.ok) {
-                throw new Error("Failed to update user details");
+                throw new Error("Failed to update profile");
             }
-
+    
             const updatedUserData = await response.json();
+            
+            // Directly update user state with the response
             setUser(updatedUserData);
+            setUpdatedUser(updatedUserData);
             setEditMode(false);
         } catch (err) {
             setError(err.message);
         }
     };
-
-    const handlePhotoUpload = async (e) => {
-        e.preventDefault();
-
-        const formData = new FormData();
-        formData.append("photo", updatedUser.photo);
-
-        try {
-            const response = await fetch("http://localhost:8000/auth/profile/upload-photo", {
-                method: "POST",
-                headers: {
-                    "Authorization": `Bearer ${token}`,
-                },
-                body: formData,
-            });
-
-            if (!response.ok) {
-                throw new Error("Failed to upload photo");
-            }
-
-            const result = await response.json();
-            console.log(result.message);
-        } catch (err) {
-            setError(err.message);
-        }
-    };
+          
 
     const fetchAvailableCoins = async () => {
         try {
@@ -223,7 +193,6 @@ const Profile = () => {
         };
     };
 
-
     if (error) {
         return <p style={{ color: "red" }}>{error}</p>;
     }
@@ -236,7 +205,6 @@ const Profile = () => {
                     <p>Email: {user.email}</p>
                     <p>Bio: {user.bio}</p>
                     <p>Phone: {user.phone}</p>
-                    {user.photo && <img src={user.photo} alt="Profile" style={{ width: '100%', borderRadius: '8px' }} />}
                     <button onClick={handleLogout}>Logout</button>
 
                     <button onClick={() => setEditMode(!editMode)}>
@@ -281,21 +249,8 @@ const Profile = () => {
                                 placeholder="Email"
                             />
                             <br />
-                            <input
-                                type="file"
-                                name="photo"
-                                accept="image/*"
-                                onChange={handleChange}
-                            />
-                            <br />
                             <button type="submit">Save Changes</button>
                         </form>
-                    )}
-
-                    {updatedUser.photo && (
-                        <button onClick={handlePhotoUpload}>
-                            Upload Photo
-                        </button>
                     )}
 
                     <button onClick={fetchAvailableCoins}>
